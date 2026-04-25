@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <title>Eye Jump - Retro Game</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.0"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5"></script>
 
 <style>
   * {
@@ -252,7 +252,8 @@
 
 <script>
 // ==================== GAME CONFIG ====================
-const URL = "https://teachablemachine.withgoogle.com/models/ZXq0QiQqS/";
+const MODEL_URL = "./model.json";
+const METADATA_URL = "./metadata.json";
 const GROUND_Y = 240;
 const PLAYER_SIZE = 25;
 
@@ -283,12 +284,20 @@ let level = 1;
 let gameSpeed = 5;
 
 // ==================== INITIALIZATION ====================
+function waitForLibraries() {
+  if (typeof tmImage === "undefined" || typeof tf === "undefined") {
+    updateStatus("Loading libraries...", false);
+    setTimeout(waitForLibraries, 100);
+    return;
+  }
+  init();
+}
+
 async function init() {
   try {
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
-
-    model = await tmImage.load(modelURL, metadataURL);
+    updateStatus("Loading Model...", false);
+    
+    model = await tmImage.load(MODEL_URL, METADATA_URL);
     updateStatus("Model loaded! Setting up webcam...", false);
 
     webcam = new tmImage.Webcam(200, 150, true);
@@ -509,7 +518,7 @@ function endGame() {
 }
 
 // ==================== START ====================
-init();
+waitForLibraries();
 </script>
 
 </body>
