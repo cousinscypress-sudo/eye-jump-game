@@ -2,184 +2,241 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Eye Jump Game</title>
-
-<!-- ✅ FIXED LIBRARIES (this was your main bug) -->
+<title>Pet Image Classifier</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-
 <style>
-  body {
-    margin: 0;
-    background: black;
-    color: #00ffcc;
-    font-family: monospace;
+/* General page styling */
+body {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    background: #FFF8F0;
     text-align: center;
-  }
+    margin: 0;
+    padding: 50px;
+    color: #555;
+}
 
-  canvas {
-    border: 2px solid #00ffcc;
-    display: block;
-    margin: 20px auto;
-    background: #111;
-  }
+/* Main container */
+.container {
+    background: #FFFBF5;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    display: inline-block;
+    max-width: 700px;
+}
+
+/* Headings */
+h1 {
+    margin-bottom: 10px;
+    color: #FF6B6B;
+}
+
+h2 {
+    margin-bottom: 15px;
+    color: #FFA07A;
+}
+
+/* Pet images section */
+#pet-images {
+    margin-bottom: 25px;
+}
+
+#pet-images div {
+    display: inline-block;
+    text-align: center;
+}
+
+#pet-images img {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* Buttons styling */
+button {
+    padding: 12px 25px;
+    margin: 10px 5px;
+    border-radius: 12px;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+#start-btn { background: #6BCB77; color: white; }
+#stop-btn { background: #FF6B6B; color: white; }
+#snapshot-btn { background: #4D96FF; color: white; }
+#reset-btn { background: #FFD93D; color: white; }
+
+/* Canvas styling */
+canvas {
+    border-radius: 15px;
+    margin-top: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Snapshot styling */
+#snapshot-result {
+    margin-top: 20px;
+}
+
+#snapshot-result img {
+    border-radius: 15px;
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+#snapshot-labels div {
+    font-weight: bold;
+    margin-top: 3px;
+    color: #555;
+}
 </style>
 </head>
-
 <body>
 
-<h2>👁️ Close Eyes = Jump</h2>
+<div class="container">
+    <h1>Pet Image Classifier 🐾</h1>
+    <p>This model detects my dog Coco vs my cat Ekun using Teachable Machine!</p>
 
-<canvas id="game" width="600" height="200"></canvas>
+    <div id="pet-images">
+        <h2>Meet My Pets</h2>
+        <div>
+            <img src="coco.jpeg" alt="Coco">
+            <p>Coco</p>
+        </div>
+        <div>
+            <img src="ekun.jpeg" alt="Ekun">
+            <p>Ekun</p>
+        </div>
+    </div>
+
+    <div>
+        <button id="start-btn" onclick="init()">Start</button>
+        <button id="stop-btn" onclick="stopWebcam()" disabled>Stop</button>
+        <button id="snapshot-btn" onclick="takeSnapshot()" disabled>Take Snapshot</button>
+        <button id="reset-btn" onclick="resetSnapshot()" disabled>Reset</button>
+    </div>
+
+    <div id="webcam-container"></div>
+
+    <!-- Webcam predictions -->
+    <div id="label-container"></div>
+
+    <!-- Snapshot + prediction stats -->
+    <div id="snapshot-result">
+        <div id="snapshot-labels"></div>
+    </div>
+</div>
 
 <script>
+const URL = "./model/";
 
-// ✅ YOUR MODEL FOLDER
-const MODEL_URL = "./tm-my-image-model/";
+let model, webcam, labelContainer, maxPredictions;
+let started = false;
+let animationFrameId;
 
-let model, webcam;
-let lastJumpTime = 0;
-
-// GAME SETUP
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-let player = {
-  x: 50,
-  y: 150,
-  width: 20,
-  height: 20,
-  velocityY: 0,
-  jumping: false
-};
-
-let gravity = 1.5;
-let obstacles = [];
-let frame = 0;
-let score = 0;
-
-// ================= INIT =================
+// Load the image model and setup the webcam
 async function init() {
-  try {
-    console.log("Loading model...");
+    if (started) return;
+    started = true;
 
-    model = await tmImage.load(
-      MODEL_URL + "model.json",
-      MODEL_URL + "metadata.json"
-    );
+    const modelURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
 
-    console.log("Model loaded");
+    document.getElementById("start-btn").disabled = true;
+    document.getElementById("stop-btn").disabled = false;
 
-    webcam = new tmImage.Webcam(200, 200, true);
+    model = await tmImage.load(modelURL, metadataURL);
+    maxPredictions = model.getTotalClasses();
 
-    await webcam.setup();  // 👈 camera popup
+    webcam = new tmImage.Webcam(200, 200, true); // front camera, no mirroring
+    await webcam.setup();
     await webcam.play();
 
-    console.log("Webcam started");
+    document.getElementById("webcam-container").innerHTML = "";
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
 
-    // 🔥 IMPORTANT: show webcam on page
-    document.body.appendChild(webcam.canvas);
-
-    window.requestAnimationFrame(loop);
-
-  } catch (err) {
-    console.error("ERROR:", err);
-    alert("Failed to load model or webcam. Check console.");
-  }
-}
-
-// ================= LOOP =================
-async function loop() {
-  webcam.update();
-  await predict();
-  updateGame();
-  drawGame();
-  requestAnimationFrame(loop);
-}
-
-// ================= PREDICT =================
-async function predict() {
-  const preds = await model.predict(webcam.canvas);
-
-  let open = 0;
-  let closed = 0;
-
-  for (let p of preds) {
-    const name = p.className.toLowerCase();
-
-    if (name.includes("open")) open = p.probability;
-    if (name.includes("closed")) closed = p.probability;
-  }
-
-  const now = Date.now();
-
-  if (
-    closed > 0.85 &&
-    closed > open &&
-    !player.jumping &&
-    now - lastJumpTime > 500
-  ) {
-    player.velocityY = -15;
-    player.jumping = true;
-    lastJumpTime = now;
-  }
-}
-
-// ================= GAME LOGIC =================
-function updateGame() {
-  frame++;
-  score++;
-
-  player.y += player.velocityY;
-  player.velocityY += gravity;
-
-  if (player.y >= 150) {
-    player.y = 150;
-    player.jumping = false;
-  }
-
-  if (frame % 90 === 0) {
-    obstacles.push({ x: 600, y: 150, w: 20, h: 20 });
-  }
-
-  obstacles.forEach(o => o.x -= 5);
-
-  for (let o of obstacles) {
-    if (
-      player.x < o.x + o.w &&
-      player.x + player.width > o.x &&
-      player.y < o.y + o.h &&
-      player.y + player.height > o.y
-    ) {
-      alert("Game Over! Score: " + score);
-      location.reload();
+    labelContainer = document.getElementById("label-container");
+    labelContainer.innerHTML = "";
+    for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
     }
-  }
+
+    document.getElementById("snapshot-btn").disabled = false;
+    document.getElementById("reset-btn").disabled = false;
+
+    animationFrameId = window.requestAnimationFrame(loop);
 }
 
-// ================= DRAW =================
-function drawGame() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // player
-  ctx.fillStyle = "#00ffcc";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
-
-  // obstacles
-  ctx.fillStyle = "red";
-  obstacles.forEach(o => {
-    ctx.fillRect(o.x, o.y, o.w, o.h);
-  });
-
-  // score
-  ctx.fillStyle = "#00ffcc";
-  ctx.fillText("Score: " + score, 10, 20);
+async function loop() {
+    webcam.update();
+    await predict();
+    animationFrameId = window.requestAnimationFrame(loop);
 }
 
-// START GAME
-init();
+async function predict() {
+    const prediction = await model.predict(webcam.canvas);
+    for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction =
+            prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction;
+    }
+}
 
+function stopWebcam() {
+    if (!webcam) return;
+    started = false;
+    webcam.stop();
+    cancelAnimationFrame(animationFrameId);
+
+    document.getElementById("webcam-container").innerHTML = "";
+    document.getElementById("label-container").innerHTML = "";
+
+    document.getElementById("start-btn").disabled = false;
+    document.getElementById("stop-btn").disabled = true;
+    document.getElementById("snapshot-btn").disabled = true;
+    document.getElementById("reset-btn").disabled = true;
+}
+
+async function takeSnapshot() {
+    if (!webcam) return;
+
+    const snapshotContainer = document.getElementById("snapshot-result");
+    const snapshotLabels = document.getElementById("snapshot-labels");
+
+    snapshotContainer.querySelector("img")?.remove();
+    snapshotLabels.innerHTML = "";
+
+    const image = new Image();
+    image.src = webcam.canvas.toDataURL("image/png");
+    snapshotContainer.prepend(image);
+
+    const prediction = await model.predict(webcam.canvas);
+    for (let i = 0; i < maxPredictions; i++) {
+        const div = document.createElement("div");
+        div.textContent = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        snapshotLabels.appendChild(div);
+    }
+}
+
+function resetSnapshot() {
+    const snapshotContainer = document.getElementById("snapshot-result");
+    const snapshotLabels = document.getElementById("snapshot-labels");
+    snapshotContainer.querySelector("img")?.remove();
+    snapshotLabels.innerHTML = "";
+    document.getElementById("snapshot-btn").disabled = false;
+}
 </script>
-
 </body>
 </html>
