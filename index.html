@@ -2,154 +2,513 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Eye Jump Game</title>
+<title>Eye Jump - Retro Game</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
 
 <style>
-  body {
+  * {
     margin: 0;
-    background: black;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: linear-gradient(135deg, #0a0e27 0%, #1a0033 100%);
     color: #00ffcc;
-    font-family: monospace;
+    font-family: 'Courier New', monospace;
     text-align: center;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .container {
+    padding: 20px;
+    max-width: 900px;
+  }
+
+  h1 {
+    font-size: 3em;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px #00ffcc;
+    letter-spacing: 3px;
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { text-shadow: 0 0 10px #00ffcc; }
+    50% { text-shadow: 0 0 20px #00ffcc, 0 0 30px #ff00ff; }
+  }
+
+  .subtitle {
+    font-size: 1.2em;
+    margin-bottom: 20px;
+    color: #ff00ff;
+  }
+
+  .game-wrapper {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   canvas {
-    border: 2px solid #00ffcc;
+    border: 4px solid #00ffcc;
     display: block;
-    margin: 20px auto;
-    background: #111;
+    background: #0a0a2e;
+    box-shadow: 0 0 20px #00ffcc;
+  }
+
+  .ui-panel {
+    border: 3px solid #ff00ff;
+    padding: 20px;
+    background: rgba(26, 0, 51, 0.8);
+    box-shadow: 0 0 15px #ff00ff;
+    text-align: left;
+    min-width: 200px;
+  }
+
+  .ui-panel h3 {
+    color: #ff00ff;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+  }
+
+  .stat {
+    margin: 10px 0;
+    font-size: 1.1em;
+  }
+
+  .stat-label {
+    color: #00ffcc;
+  }
+
+  .stat-value {
+    color: #ffff00;
+    font-weight: bold;
+    font-size: 1.3em;
+  }
+
+  .webcam-feed {
+    border: 2px solid #00ffcc;
+    margin-top: 10px;
+    background: #000;
+    display: none;
+  }
+
+  #webcam {
+    width: 200px;
+    height: 150px;
+  }
+
+  .status {
+    margin-top: 20px;
+    padding: 10px;
+    border: 2px solid #00ffcc;
+    background: rgba(0, 255, 204, 0.1);
+    font-size: 0.9em;
+  }
+
+  .status.ready {
+    color: #00ff00;
+    border-color: #00ff00;
+    background: rgba(0, 255, 0, 0.1);
+  }
+
+  .instructions {
+    margin-top: 20px;
+    padding: 15px;
+    border: 2px dashed #00ffcc;
+    background: rgba(0, 255, 204, 0.05);
+    font-size: 0.95em;
+    line-height: 1.6;
+  }
+
+  .game-over {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .game-over.show {
+    display: flex;
+  }
+
+  .game-over-content {
+    border: 5px solid #ff00ff;
+    padding: 40px;
+    background: #0a0a2e;
+    text-align: center;
+    box-shadow: 0 0 30px #ff00ff;
+  }
+
+  .game-over h2 {
+    font-size: 2.5em;
+    color: #ff0000;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #ff0000;
+  }
+
+  .game-over p {
+    font-size: 1.5em;
+    color: #ffff00;
+    margin: 10px 0;
+  }
+
+  .game-over button {
+    margin-top: 20px;
+    padding: 15px 30px;
+    font-size: 1.2em;
+    background: #ff00ff;
+    color: black;
+    border: 2px solid #ff00ff;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+  }
+
+  .game-over button:hover {
+    background: #00ffcc;
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px #00ffcc;
   }
 </style>
 </head>
 
 <body>
 
-<h2>👁️ Close Eyes = Jump</h2>
+<div class="container">
+  <h1>👁️ EYE JUMP 👁️</h1>
+  <p class="subtitle">RETRO EYE-TRACKING GAME</p>
 
-<canvas id="game" width="600" height="200"></canvas>
+  <div class="game-wrapper">
+    <div>
+      <canvas id="gameCanvas" width="800" height="300"></canvas>
+      
+      <div class="status" id="status">
+        Loading Model...
+      </div>
+
+      <div class="instructions">
+        <strong>HOW TO PLAY:</strong><br>
+        👀 Allow camera access when prompted<br>
+        😑 <strong>CLOSE YOUR EYES</strong> to jump over obstacles<br>
+        🏃 Avoid the red blocks<br>
+        ⚡ Difficulty increases as you play
+      </div>
+    </div>
+
+    <div class="ui-panel">
+      <h3>📊 STATS</h3>
+      
+      <div class="stat">
+        <span class="stat-label">Score:</span><br>
+        <span class="stat-value" id="scoreDisplay">0</span>
+      </div>
+
+      <div class="stat">
+        <span class="stat-label">Level:</span><br>
+        <span class="stat-value" id="levelDisplay">1</span>
+      </div>
+
+      <div class="stat">
+        <span class="stat-label">Speed:</span><br>
+        <span class="stat-value" id="speedDisplay">5</span>
+      </div>
+
+      <div class="stat">
+        <span class="stat-label">Eyes:</span><br>
+        <span id="eyeStatus" style="color: #ffff00;">Detecting...</span>
+      </div>
+
+      <div class="webcam-feed">
+        <div id="webcam"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="game-over" id="gameOverScreen">
+  <div class="game-over-content">
+    <h2>GAME OVER</h2>
+    <p>Final Score: <span id="finalScore">0</span></p>
+    <p>Level Reached: <span id="finalLevel">1</span></p>
+    <button onclick="location.reload()">PLAY AGAIN</button>
+  </div>
+</div>
 
 <script>
+// ==================== GAME CONFIG ====================
 const URL = "https://teachablemachine.withgoogle.com/models/ZXq0QiQqS/";
+const GROUND_Y = 240;
+const PLAYER_SIZE = 25;
 
+// ==================== GAME STATE ====================
 let model, webcam;
 let lastJumpTime = 0;
+let gameRunning = true;
+let difficultyMultiplier = 1;
 
-// GAME
-const canvas = document.getElementById("game");
+const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let player = { x: 50, y: 150, w: 20, h: 20, vy: 0, jumping: false };
-let gravity = 1.5;
+let player = {
+  x: 60,
+  y: GROUND_Y,
+  width: PLAYER_SIZE,
+  height: PLAYER_SIZE,
+  velocityY: 0,
+  jumping: false,
+  jumpPower: -20
+};
+
+let gravity = 1;
 let obstacles = [];
 let frame = 0;
 let score = 0;
+let level = 1;
+let gameSpeed = 5;
 
+// ==================== INITIALIZATION ====================
 async function init() {
   try {
-    console.log("Loading model...");
+    const modelURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
 
-    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+    model = await tmImage.load(modelURL, metadataURL);
+    updateStatus("Model loaded! Setting up webcam...", false);
 
-    console.log("Starting webcam...");
-
-    webcam = new tmImage.Webcam(200, 200, true);
-
-    await webcam.setup();   // 👈 MUST trigger permission
+    webcam = new tmImage.Webcam(200, 150, true);
+    await webcam.setup();
     await webcam.play();
-
-    console.log("Webcam ready");
-
-    document.body.appendChild(webcam.canvas);
-
-    window.requestAnimationFrame(loop);
-
-  } catch (err) {
-    console.error("INIT ERROR:", err);
-    alert("Webcam failed: check console (Inspect → Console)");
+    
+    updateStatus("Ready to play! Close your eyes to jump.", true);
+    window.requestAnimationFrame(gameLoop);
+  } catch (error) {
+    updateStatus("Error loading model: " + error.message, false);
+    console.error(error);
   }
 }
 
-async function loop() {
+function updateStatus(message, isReady) {
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = message;
+  if (isReady) {
+    statusEl.classList.add("ready");
+  }
+}
+
+// ==================== GAME LOOP ====================
+async function gameLoop() {
+  if (!gameRunning) {
+    return;
+  }
+
   webcam.update();
   await predict();
-  update();
-  draw();
-  requestAnimationFrame(loop);
+  updateGame();
+  drawGame();
+  updateUI();
+
+  window.requestAnimationFrame(gameLoop);
 }
 
+// ==================== EYE DETECTION ====================
 async function predict() {
-  const preds = await model.predict(webcam.canvas);
+  const predictions = await model.predict(webcam.canvas);
 
-  let open = 0;
-  let closed = 0;
+  let openProb = 0;
+  let closedProb = 0;
 
-  for (let p of preds) {
+  predictions.forEach(p => {
     const name = p.className.toLowerCase();
-    if (name.includes("open")) open = p.probability;
-    if (name.includes("closed")) closed = p.probability;
+    if (name.includes("open")) openProb = p.probability;
+    if (name.includes("closed")) closedProb = p.probability;
+  });
+
+  // Update eye status display
+  const eyeStatus = document.getElementById("eyeStatus");
+  if (openProb > closedProb) {
+    eyeStatus.textContent = "👀 Open";
+    eyeStatus.style.color = "#00ff00";
+  } else {
+    eyeStatus.textContent = "😑 Closed";
+    eyeStatus.style.color = "#ff0000";
   }
 
-  let now = Date.now();
-
+  // Jump on closed eyes
+  const now = Date.now();
   if (
-    closed > 0.85 &&
-    closed > open &&
+    closedProb > 0.85 &&
+    closedProb > openProb &&
     !player.jumping &&
-    now - lastJumpTime > 500
+    now - lastJumpTime > 400
   ) {
-    player.vy = -15;
+    player.velocityY = player.jumpPower;
     player.jumping = true;
     lastJumpTime = now;
   }
 }
 
-function update() {
+// ==================== GAME LOGIC ====================
+function updateGame() {
   frame++;
-  score++;
+  score += Math.floor(difficultyMultiplier);
 
-  player.y += player.vy;
-  player.vy += gravity;
+  // Player physics
+  player.y += player.velocityY;
+  player.velocityY += gravity;
 
-  if (player.y >= 150) {
-    player.y = 150;
+  // Ground collision
+  if (player.y >= GROUND_Y) {
+    player.y = GROUND_Y;
+    player.velocityY = 0;
     player.jumping = false;
   }
 
-  if (frame % 90 === 0) {
-    obstacles.push({ x: 600, y: 150, w: 20, h: 20 });
+  // Spawn obstacles with increasing frequency
+  const spawnRate = Math.max(50, 90 - Math.floor(level * 5));
+  if (frame % spawnRate === 0) {
+    obstacles.push({
+      x: canvas.width,
+      y: GROUND_Y,
+      w: 20,
+      h: 30,
+      type: "cactus"
+    });
   }
 
-  obstacles.forEach(o => o.x -= 5);
+  // Move obstacles
+  obstacles.forEach(o => {
+    o.x -= gameSpeed;
+  });
 
-  for (let o of obstacles) {
+  // Remove off-screen obstacles
+  obstacles = obstacles.filter(o => o.x > -50);
+
+  // Collision detection
+  obstacles.forEach(o => {
     if (
       player.x < o.x + o.w &&
-      player.x + player.w > o.x &&
+      player.x + player.width > o.x &&
       player.y < o.y + o.h &&
-      player.y + player.h > o.y
+      player.y + player.height > o.y
     ) {
-      alert("Game Over! Score: " + score);
-      location.reload();
+      endGame();
     }
+  });
+
+  // Difficulty progression
+  const newLevel = Math.floor(score / 500) + 1;
+  if (newLevel !== level) {
+    level = newLevel;
+    gameSpeed = 5 + (level - 1) * 1.5;
+    difficultyMultiplier = 1 + (level - 1) * 0.3;
   }
 }
 
-function draw() {
-  ctx.clearRect(0, 0, 600, 200);
+// ==================== RENDERING ====================
+function drawGame() {
+  // Background
+  ctx.fillStyle = "#0a0a2e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "#00ffcc";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
+  // Grid pattern
+  ctx.strokeStyle = "rgba(0, 255, 204, 0.1)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < canvas.width; i += 40) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, canvas.height);
+    ctx.stroke();
+  }
 
-  ctx.fillStyle = "red";
-  obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+  // Ground line
+  ctx.strokeStyle = "#00ffcc";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y + PLAYER_SIZE);
+  ctx.lineTo(canvas.width, GROUND_Y + PLAYER_SIZE);
+  ctx.stroke();
 
-  ctx.fillStyle = "#00ffcc";
-  ctx.fillText("Score: " + score, 10, 20);
+  // Player (eye character)
+  drawPlayer();
+
+  // Obstacles
+  drawObstacles();
+
+  // Score in-game
+  ctx.fillStyle = "#ffff00";
+  ctx.font = "bold 18px monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("SCORE: " + score, 20, 30);
 }
 
+function drawPlayer() {
+  const eyeX = player.x + player.width / 2;
+  const eyeY = player.y + player.height / 2;
+
+  // Body
+  ctx.fillStyle = "#00ffcc";
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, player.width / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner circle (pupil)
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, player.width / 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shine effect
+  ctx.fillStyle = "#ffff00";
+  ctx.beginPath();
+  ctx.arc(eyeX - 3, eyeY - 3, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawObstacles() {
+  obstacles.forEach(o => {
+    // Cactus shape
+    ctx.fillStyle = "#ff0000";
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+
+    // Add spikes
+    ctx.fillStyle = "#ff6666";
+    ctx.fillRect(o.x - 5, o.y + 5, 5, 10);
+    ctx.fillRect(o.x + o.w, o.y + 5, 5, 10);
+    ctx.fillRect(o.x + o.w / 2 - 2.5, o.y - 5, 5, 5);
+  });
+}
+
+function updateUI() {
+  document.getElementById("scoreDisplay").textContent = score;
+  document.getElementById("levelDisplay").textContent = level;
+  document.getElementById("speedDisplay").textContent = gameSpeed.toFixed(1);
+}
+
+function endGame() {
+  gameRunning = false;
+
+  document.getElementById("finalScore").textContent = score;
+  document.getElementById("finalLevel").textContent = level;
+  document.getElementById("gameOverScreen").classList.add("show");
+}
+
+// ==================== START ====================
 init();
 </script>
 
