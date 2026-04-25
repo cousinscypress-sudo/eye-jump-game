@@ -57,7 +57,8 @@ let gravity = 1.5;
 let obstacles = [];
 let frame = 0;
 let score = 0;
-
+let closedFrames = 0;
+let openFrames = 0;
 // ================= INIT =================
 async function init() {
   try {
@@ -96,7 +97,6 @@ async function loop() {
   drawGame();
   requestAnimationFrame(loop);
 }
-
 // ================= PREDICT =================
 async function predict() {
   const preds = await model.predict(webcam.canvas);
@@ -106,25 +106,32 @@ async function predict() {
 
   for (let p of preds) {
     const name = p.className.toLowerCase();
-
     if (name.includes("open")) open = p.probability;
     if (name.includes("closed")) closed = p.probability;
   }
 
   const now = Date.now();
 
+  // track stability
+  if (closed > open) {
+    closedFrames++;
+    openFrames = 0;
+  } else {
+    openFrames++;
+    closedFrames = 0;
+  }
+
+  // 👇 REAL blink trigger
   if (
-    closed > 0.85 &&
-    closed > open &&
+    closedFrames >= 5 &&     // must be closed for ~5 frames
     !player.jumping &&
-    now - lastJumpTime > 500
+    now - lastJumpTime > 600
   ) {
     player.velocityY = -15;
     player.jumping = true;
     lastJumpTime = now;
   }
 }
-
 // ================= GAME LOGIC =================
 function updateGame() {
   frame++;
