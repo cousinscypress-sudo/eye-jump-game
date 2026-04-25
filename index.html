@@ -27,7 +27,7 @@
 
 <body>
 
-<h2>👁️ Close Eyes to Jump</h2>
+<h2>👁️ Close Eyes = Jump</h2>
 
 <canvas id="game" width="600" height="200"></canvas>
 
@@ -35,6 +35,7 @@
 const URL = "https://teachablemachine.withgoogle.com/models/ZXq0QiQqS/";
 
 let model, webcam;
+let maxPredictions;
 let lastJumpTime = 0;
 
 // GAME SETUP
@@ -61,10 +62,15 @@ async function init() {
   const metadataURL = URL + "metadata.json";
 
   model = await tmImage.load(modelURL, metadataURL);
+  maxPredictions = model.getTotalClasses();
 
-  webcam = new tmImage.Webcam(200, 150, true);
+  // 🔥 IMPORTANT: webcam setup (same style as your working project)
+  webcam = new tmImage.Webcam(200, 200, true);
   await webcam.setup();
   await webcam.play();
+
+  // 🔥 THIS IS THE FIX (make webcam visible)
+  document.body.appendChild(webcam.canvas);
 
   window.requestAnimationFrame(loop);
 }
@@ -72,27 +78,25 @@ async function init() {
 // LOOP
 async function loop() {
   webcam.update();
-
   await predict();
   updateGame();
   drawGame();
-
   window.requestAnimationFrame(loop);
 }
 
-// PREDICT EYES
+// PREDICTION
 async function predict() {
-  const predictions = await model.predict(webcam.canvas);
+  const prediction = await model.predict(webcam.canvas);
 
   let open = 0;
   let closed = 0;
 
-  predictions.forEach(p => {
-    const name = p.className.toLowerCase();
+  for (let i = 0; i < prediction.length; i++) {
+    const name = prediction[i].className.toLowerCase();
 
-    if (name.includes("open")) open = p.probability;
-    if (name.includes("closed")) closed = p.probability;
-  });
+    if (name.includes("open")) open = prediction[i].probability;
+    if (name.includes("closed")) closed = prediction[i].probability;
+  }
 
   const now = Date.now();
 
