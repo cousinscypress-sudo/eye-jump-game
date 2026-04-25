@@ -86,6 +86,7 @@ let frame = 0;
 let score = 0;
 let closedFrames = 0;
 let openFrames = 0;
+let gameRunning = true;
 // ================= INIT =================
 async function init() {
   try {
@@ -118,10 +119,13 @@ async function init() {
 
 // ================= LOOP =================
 async function loop() {
+  if (!gameRunning) return;
+
   webcam.update();
   await predict();
   updateGame();
   drawGame();
+
   requestAnimationFrame(loop);
 }
 // ================= PREDICT =================
@@ -206,6 +210,13 @@ function drawGame() {
   // score
   ctx.fillStyle = "#00ffcc";
   ctx.fillText("Score: " + score, 10, 20);
+}
+
+  function gameOver() {
+  gameRunning = false;
+
+  document.getElementById("finalScore").innerText = "Score: " + score;
+  document.getElementById("gameOverScreen").style.display = "flex";
 }
 
 // START GAME
