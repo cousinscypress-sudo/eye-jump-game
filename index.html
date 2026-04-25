@@ -35,70 +35,64 @@
 const URL = "https://teachablemachine.withgoogle.com/models/ZXq0QiQqS/";
 
 let model, webcam;
-let maxPredictions;
 let lastJumpTime = 0;
 
-// GAME SETUP
+// GAME
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let player = {
-  x: 50,
-  y: 150,
-  width: 20,
-  height: 20,
-  velocityY: 0,
-  jumping: false
-};
-
+let player = { x: 50, y: 150, w: 20, h: 20, vy: 0, jumping: false };
 let gravity = 1.5;
 let obstacles = [];
 let frame = 0;
 let score = 0;
 
-// INIT
 async function init() {
-  const modelURL = URL + "model.json";
-  const metadataURL = URL + "metadata.json";
+  try {
+    console.log("Loading model...");
 
-  model = await tmImage.load(modelURL, metadataURL);
-  maxPredictions = model.getTotalClasses();
+    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
 
-  // 🔥 IMPORTANT: webcam setup (same style as your working project)
-  webcam = new tmImage.Webcam(200, 200, true);
-  await webcam.setup();
-  await webcam.play();
+    console.log("Starting webcam...");
 
-  // 🔥 THIS IS THE FIX (make webcam visible)
-  document.body.appendChild(webcam.canvas);
+    webcam = new tmImage.Webcam(200, 200, true);
 
-  window.requestAnimationFrame(loop);
+    await webcam.setup();   // 👈 MUST trigger permission
+    await webcam.play();
+
+    console.log("Webcam ready");
+
+    document.body.appendChild(webcam.canvas);
+
+    window.requestAnimationFrame(loop);
+
+  } catch (err) {
+    console.error("INIT ERROR:", err);
+    alert("Webcam failed: check console (Inspect → Console)");
+  }
 }
 
-// LOOP
 async function loop() {
   webcam.update();
   await predict();
-  updateGame();
-  drawGame();
-  window.requestAnimationFrame(loop);
+  update();
+  draw();
+  requestAnimationFrame(loop);
 }
 
-// PREDICTION
 async function predict() {
-  const prediction = await model.predict(webcam.canvas);
+  const preds = await model.predict(webcam.canvas);
 
   let open = 0;
   let closed = 0;
 
-  for (let i = 0; i < prediction.length; i++) {
-    const name = prediction[i].className.toLowerCase();
-
-    if (name.includes("open")) open = prediction[i].probability;
-    if (name.includes("closed")) closed = prediction[i].probability;
+  for (let p of preds) {
+    const name = p.className.toLowerCase();
+    if (name.includes("open")) open = p.probability;
+    if (name.includes("closed")) closed = p.probability;
   }
 
-  const now = Date.now();
+  let now = Date.now();
 
   if (
     closed > 0.85 &&
@@ -106,19 +100,18 @@ async function predict() {
     !player.jumping &&
     now - lastJumpTime > 500
   ) {
-    player.velocityY = -15;
+    player.vy = -15;
     player.jumping = true;
     lastJumpTime = now;
   }
 }
 
-// GAME UPDATE
-function updateGame() {
+function update() {
   frame++;
   score++;
 
-  player.y += player.velocityY;
-  player.velocityY += gravity;
+  player.y += player.vy;
+  player.vy += gravity;
 
   if (player.y >= 150) {
     player.y = 150;
@@ -131,39 +124,32 @@ function updateGame() {
 
   obstacles.forEach(o => o.x -= 5);
 
-  obstacles.forEach(o => {
+  for (let o of obstacles) {
     if (
       player.x < o.x + o.w &&
-      player.x + player.width > o.x &&
+      player.x + player.w > o.x &&
       player.y < o.y + o.h &&
-      player.y + player.height > o.y
+      player.y + player.h > o.y
     ) {
       alert("Game Over! Score: " + score);
       location.reload();
     }
-  });
+  }
 }
 
-// DRAW
-function drawGame() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function draw() {
+  ctx.clearRect(0, 0, 600, 200);
 
-  // player
   ctx.fillStyle = "#00ffcc";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
+  ctx.fillRect(player.x, player.y, player.w, player.h);
 
-  // obstacles
   ctx.fillStyle = "red";
-  obstacles.forEach(o => {
-    ctx.fillRect(o.x, o.y, o.w, o.h);
-  });
+  obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
 
-  // score
   ctx.fillStyle = "#00ffcc";
   ctx.fillText("Score: " + score, 10, 20);
 }
 
-// START GAME
 init();
 </script>
 
